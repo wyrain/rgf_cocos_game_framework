@@ -4,29 +4,25 @@
  * Time: 2021-12-25
  */
 
-/** 单个事件数据, 由调用者和回调组成 */
-interface EventData {
-    context: any;
-    handler: Function;
-}
-
 export default class EventManager {
-    /** 全部事件Map
-     * 同一个事件名下, 可以有多个对象的事件注册, 使用数组将这些事件数据存起来
-     */
-    private static events: Map<string, EventData[]> = new Map();
+    /** 事件容器Map, 实时存储了所有事件, 以事件名为key */
+    private static events: Map<string, Map<Object, Function>> = new Map();
+    /** 事件记录Map, 存储了各对象身上注册的事件记录, 方便以对象为单位批量注销事件, 不可用于判断对象身上现存哪些事件 */
+    private static eventInfo: Map<Object, Array<string>> = new Map();
 
     /** 注册事件
      * @param name 事件名
      * @param handler 事件回调
      * @param context 回调的调用者
+     * @desc 事件重复注册会覆盖
      */
-    static on(name: string, handler: Function, context: any) {
-        if (!this.events.has(name)) {
-            this.events.set(name, []);
-        }
-        let eventData: EventData = { context: context, handler: handler };
-        this.events.get(name).push(eventData);
+    static on(name: string, handler: Function, context: object) {
+        // 存入容器
+        let events: Map<object, Function> = this.events.get(name) || new Map();
+        events.set(context, handler);
+        // 加上记录, 添加记录是不考虑重复的
+        let objEvents: Array<string> = this.eventInfo.get(context) || [];
+        objEvents.push(name);
     }
 
     /** 注销事件
@@ -34,18 +30,14 @@ export default class EventManager {
      * @param handler 事件回调
      * @param context 回调的调用者
      */
-    static off(name: string, handler: Function, context: any) {
-        let eventDataList: EventData[] = this.events.get(name);
-        if (!eventDataList) {
-            console.warn(`事件&{name}不存在`);
+    static off(name: string, context: any) {
+        let events: Map<object, Function> = this.events.get(name);
+        if (!events) {
+            console.warn(`事件&{name}未注册, 无需注销`);
             return;
         }
-        for (let i = 0, l = eventDataList.length; i < l; i++) {
-            let eventData: EventData = eventDataList[i];
-            if (!eventData.context || (eventData.context === context && eventData.handler === handler)) {
-                eventDataList.splice(i, 1);
-            }
-        }
+        // 移除事件
+        events.delete(context);
     }
 
     /** 派发事件
@@ -53,15 +45,42 @@ export default class EventManager {
      * @param params 传递的参数, 可不传但最多传一个, 需要传多个请用对象包起来
      */
     static emit(name: string, params: any) {
-        let eventDataList: EventData[] = this.events.get(name);
-        if (!eventDataList) {
-            console.warn(`事件&{name}不存在`);
+        let events: Map<object, Function> = this.events.get(name);
+        if (!events) {
+            console.warn(`事件&{name}未注册, 无法派发`);
             return;
         }
-        for (let i = 0, l = eventDataList.length; i < l; i++) {
-            const { handler, context }: EventData = eventDataList[i];
+        for (let [context, handler] of events.entries()) {
             handler.call(context, params);
         }
     };
+
+    /** 为对象注册一组事件
+     * @eventMap 待注册的事件, 类型:object<string: Function>, 示例: {name1:function1, name2:function2 ...}
+     * @context 对象
+     */
+    static onAll(eventMap: object, context: object) {
+        for (const eventName in eventMap) {
+            let handler: Function = eventMap[eventName];
+            this.on(eventName, handler, context);
+        }
+    }
+
+    /** 注销对象绑定的全部事件
+     * @context 对象
+     */
+    static offAll(context: object) {
+        let infos: Array<string> = this.eventInfo.get(context);
+        if (!infos) {
+            console.warn(`对象上未检测到事件, 无需注销`);
+            return;
+        }
+        // 移除对象身上的全部事件
+        infos.forEach((eventName: string) => {
+            this.off(eventName, context);
+        });
+        // 移除对象的事件记录
+        this.eventInfo.delete(context);
+    }
 }
 
