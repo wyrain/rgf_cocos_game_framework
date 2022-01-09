@@ -22,3 +22,4 @@ node_modules/
 # WebStorm
 #//////////////////////////
 .idea/
+preview-template-3.x只能放在项目根目录下解压-无法全局使用.zip

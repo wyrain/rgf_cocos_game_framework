@@ -1,7 +1,11 @@
-/** rgf游戏开发框架
- * 事件管理类
- * Author: rain
- * Time: 2021-12-25
+/*
+ * @Author: rain
+ * @Date: 2021-12-25 23:39:02
+ * @LastEditTime: 2022-01-09 14:52:45
+ * @LastEditors: rain
+ * @Description: 事件管理类
+ * @FilePath: \rgf\assets\script\common\EventManager.ts
+ * 代码如诗
  */
 
 export default class EventManager {
@@ -18,10 +22,17 @@ export default class EventManager {
      */
     static on(name: string, handler: Function, context: object) {
         // 存入容器
-        let events: Map<object, Function> = this.events.get(name) || new Map();
-        events.set(context, handler);
+        if (!this.events.get(name)) {
+            this.events.set(name, new Map());
+        }
+        let eMap: Map<object, Function> = this.events.get(name);
+        eMap.set(context, handler);
+
         // 加上记录, 添加记录是不考虑重复的
-        let objEvents: Array<string> = this.eventInfo.get(context) || [];
+        if (!this.eventInfo.get(context)) {
+            this.eventInfo.set(context, []);
+        }
+        let objEvents: Array<string> = this.eventInfo.get(context);
         objEvents.push(name);
     }
 
@@ -31,26 +42,26 @@ export default class EventManager {
      * @param context 回调的调用者
      */
     static off(name: string, context: any) {
-        let events: Map<object, Function> = this.events.get(name);
-        if (!events) {
+        let eMap: Map<object, Function> = this.events.get(name);
+        if (!eMap) {
             console.warn(`事件&{name}未注册, 无需注销`);
             return;
         }
         // 移除事件
-        events.delete(context);
+        eMap.delete(context);
     }
 
     /** 派发事件
      * @param name 事件名
      * @param params 传递的参数, 可不传但最多传一个, 需要传多个请用对象包起来
      */
-    static emit(name: string, params: any) {
-        let events: Map<object, Function> = this.events.get(name);
-        if (!events) {
+    static emit(name: string, params?: any) {
+        let eMap: Map<object, Function> = this.events.get(name);
+        if (!eMap) {
             console.warn(`事件&{name}未注册, 无法派发`);
             return;
         }
-        for (let [context, handler] of events.entries()) {
+        for (let [context, handler] of eMap.entries()) {
             handler.call(context, params);
         }
     };
